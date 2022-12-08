@@ -1,10 +1,15 @@
 import cv2
+import numpy as np
 import mediapipe as mp
 from mediapipe.python.solutions.drawing_utils import _normalized_to_pixel_coordinates
+from keras.models import load_model
 mp_face_detection = mp.solutions.face_detection
 mp_drawing = mp.solutions.drawing_utils
 
 i = 0
+
+#load model
+model = load_model('model_rgb_1.h5')
 
 # For webcam input:
 cap = cv2.VideoCapture(0)
@@ -34,69 +39,59 @@ with mp_face_detection.FaceDetection(
 
     if results.detections:
       # Get current faces
-      if i == 0:
-        for faces in range(len(results.detections)):
+      for faces in range(len(results.detections)):
 
-          detection = results.detections[faces]
-          #mp_drawing.draw_detection(image, detection)
+        detection = results.detections[faces]
+        #mp_drawing.draw_detection(image, detection)
 
 
-          location = detection.location_data
+        location = detection.location_data
 
-          relative_bounding_box = location.relative_bounding_box
-          rect_start_point = _normalized_to_pixel_coordinates(
-            relative_bounding_box.xmin, relative_bounding_box.ymin, width,
-            height)
-          rect_end_point = _normalized_to_pixel_coordinates(
-            relative_bounding_box.xmin + relative_bounding_box.width,
-            relative_bounding_box.ymin + relative_bounding_box.height, width,
-            height)
-          if (rect_start_point is not None) and (rect_end_point is not None):
-            xleft, ytop = rect_start_point
-            xright, ybot = rect_end_point
+        relative_bounding_box = location.relative_bounding_box
+        rect_start_point = _normalized_to_pixel_coordinates(
+          relative_bounding_box.xmin, relative_bounding_box.ymin, width,
+          height)
+        rect_end_point = _normalized_to_pixel_coordinates(
+          relative_bounding_box.xmin + relative_bounding_box.width,
+          relative_bounding_box.ymin + relative_bounding_box.height, width,
+          height)
+        if (rect_start_point is not None) and (rect_end_point is not None):
+          xleft, ytop = rect_start_point
+          xright, ybot = rect_end_point
 
-            # Crop the face from the frame
-            crop_img = image[ytop: ybot, xleft: xright]
-            # Resize the face to 48x48px for classification neural network
-            crop_img = cv2.resize(crop_img, dsize=(48, 48), interpolation=cv2.INTER_CUBIC)
-            # Save the face in a jpg file
-            cv2.imwrite('crop'+str(faces)+'.jpg', crop_img)
+          # Crop the face from the frame
+          crop_img = image[ytop: ybot, xleft: xright]
+          # Resize the face to 48x48px for classification neural network
+          crop_img = cv2.resize(crop_img, dsize=(48, 48), interpolation=cv2.INTER_CUBIC)
+          # Save the face in a jpg file
+          cv2.imwrite('crop' + str(faces) + '.jpg', crop_img)
+          crop_img = crop_img[np.newaxis, :]
 
-            ## Lets draw a bounding box
-            color = (255, 0, 0)
-            thickness = 2
-            cv2.rectangle(image, rect_start_point, rect_end_point, color, thickness)
-            xleft, ytop = rect_start_point
-            xright, ybot = rect_end_point
+          predictions = model.predict(crop_img)
 
-      # Draw the bounding box
-      else:
-        for faces in range(len(results.detections)):
-          detection = results.detections[faces]
 
-          location = detection.location_data
+          # find max indexed array
+          max_index = np.argmax(predictions[0])
 
-          relative_bounding_box = location.relative_bounding_box
-          rect_start_point = _normalized_to_pixel_coordinates(
-            relative_bounding_box.xmin, relative_bounding_box.ymin, width,
-            height)
-          rect_end_point = _normalized_to_pixel_coordinates(
-            relative_bounding_box.xmin + relative_bounding_box.width,
-            relative_bounding_box.ymin + relative_bounding_box.height, width,
-            height)
-          if (rect_start_point is not None) and (rect_end_point is not None):
-            xleft, ytop = rect_start_point
-            xright, ybot = rect_end_point
+          emotions = ('angry', 'happy','neutral', 'sad', 'surprise')
+          predicted_emotion = emotions[max_index]
 
-            ## Lets draw a bounding box
-            color = (255, 0, 0)
-            thickness = 2
-            cv2.rectangle(image, rect_start_point, rect_end_point, color, thickness)
-            xleft, ytop = rect_start_point
-            xright, ybot = rect_end_point
+          frame = cv2.flip(image, 1)
+          text_x, text_y = rect_start_point
+          cv2.putText(frame, predicted_emotion, (text_x,text_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-    # Flip the image horizontally for a selfie-view display.
-    cv2.imshow('Emotions', cv2.flip(image, 1))
-    if cv2.waitKey(5) & 0xFF == 27:
+          ## Lets draw a bounding box
+          color = (255, 0, 0)
+          thickness = 2
+          cv2.rectangle(frame, rect_start_point, rect_end_point, color, thickness)
+          xleft, ytop = rect_start_point
+          xright, ybot = rect_end_point
+
+          # Flip the image horizontally for a selfie-view display.
+          cv2.imshow('Face Recognition Analysis', frame)
+
+    if cv2.waitKey(10) == ord('q'):  # wait until 'q' key is pressed
       break
+
 cap.release()
+cv2.destroyAllWindows
