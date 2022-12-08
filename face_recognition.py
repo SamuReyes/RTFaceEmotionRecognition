@@ -6,8 +6,6 @@ from keras.models import load_model
 mp_face_detection = mp.solutions.face_detection
 mp_drawing = mp.solutions.drawing_utils
 
-i = 0
-
 #load model
 model = load_model('model_rgb_1.h5')
 
@@ -21,10 +19,6 @@ with mp_face_detection.FaceDetection(
       print("Ignoring empty camera frame.")
       # If loading a video, use 'break' instead of 'continue'.
       continue
-
-    # Iterator over frames
-    i += 1
-    i %= 30
 
     # To improve performance, optionally mark the image as not writeable to
     # pass by reference.
@@ -63,32 +57,32 @@ with mp_face_detection.FaceDetection(
           crop_img = image[ytop: ybot, xleft: xright]
           # Resize the face to 48x48px for classification neural network
           crop_img = cv2.resize(crop_img, dsize=(48, 48), interpolation=cv2.INTER_CUBIC)
-          # Save the face in a jpg file
-          cv2.imwrite('crop' + str(faces) + '.jpg', crop_img)
+
+          # Change dimensionality of image to use as valid input of the model
           crop_img = crop_img[np.newaxis, :]
 
+          # Get model output
           predictions = model.predict(crop_img)
 
-
-          # find max indexed array
+          # Find max indexed array
           max_index = np.argmax(predictions[0])
 
+          # Get emotion from model output
           emotions = ('angry', 'happy','neutral', 'sad', 'surprise')
           predicted_emotion = emotions[max_index]
 
-          frame = cv2.flip(image, 1)
+          # Put emotion text on image
           text_x, text_y = rect_start_point
-          cv2.putText(frame, predicted_emotion, (text_x,text_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+          cv2.putText(image, predicted_emotion, (text_x,text_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
           ## Lets draw a bounding box
           color = (255, 0, 0)
           thickness = 2
-          cv2.rectangle(frame, rect_start_point, rect_end_point, color, thickness)
+          cv2.rectangle(image, rect_start_point, rect_end_point, color, thickness)
           xleft, ytop = rect_start_point
           xright, ybot = rect_end_point
 
-          # Flip the image horizontally for a selfie-view display.
-          cv2.imshow('Face Recognition Analysis', frame)
+          cv2.imshow('Face Recognition Analysis', image)
 
     if cv2.waitKey(10) == ord('q'):  # wait until 'q' key is pressed
       break
