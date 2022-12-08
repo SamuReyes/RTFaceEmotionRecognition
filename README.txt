@@ -1,0 +1,1 @@
+Para ejecutar el programa en la terminal debemos dirigirnos al directorio donde está guardado el archivo face_recognition.py y escribimos python o python3,un espacio, escribimos el nombre del archivo y pulsamos enter
